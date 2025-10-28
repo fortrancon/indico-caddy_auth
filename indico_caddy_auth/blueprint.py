@@ -6,9 +6,7 @@
 # see the LICENSE file for more details.
 
 from indico.core.plugins import IndicoPluginBlueprint
-
 from indico_caddy_auth.controllers import RHCaddyAuthValidate
-
 
 blueprint = IndicoPluginBlueprint('caddy_auth', 'indico_caddy_auth')
 

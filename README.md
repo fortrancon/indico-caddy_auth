@@ -88,8 +88,8 @@ python3 -m py_compile indico_caddy_auth/*.py
 
 The repository includes a CI workflow that:
 - Runs on push/PR to `main` and `develop` branches
-- Checks code syntax and formatting
-- Runs ruff linting with Indico-compatible rules
+- Executes all pre-commit hooks (ruff linting, formatting, syntax checks, etc.)
+- Uses the same configuration as local development
 
 ## Testing
 

@@ -5,8 +5,9 @@
 # them and/or modify them under the terms of the MIT License;
 # see the LICENSE file for more details.
 
-from flask import make_response, session, request, redirect
 from urllib.parse import urljoin
+
+from flask import make_response, redirect, request, session
 
 from indico.core.config import config
 from indico.web.rh import RH
@@ -24,10 +25,10 @@ class RHCaddyAuthValidate(RH):
             original_proto = request.headers.get('X-Forwarded-Proto', 'https')
 
             if original_uri:
-                return_url = f"{original_proto}://{original_host}{original_uri}"
-                login_url = urljoin(config.BASE_URL, f"login?next={return_url}")
+                return_url = f'{original_proto}://{original_host}{original_uri}'
+                login_url = urljoin(config.BASE_URL, f'login?next={return_url}')
             else:
-                login_url = urljoin(config.BASE_URL, "login")
+                login_url = urljoin(config.BASE_URL, 'login')
 
             return redirect(login_url)
 

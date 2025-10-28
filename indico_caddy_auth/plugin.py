@@ -6,8 +6,6 @@
 # see the LICENSE file for more details.
 
 from indico.core.plugins import IndicoPlugin
-
-from indico_caddy_auth import _
 from indico_caddy_auth.blueprint import blueprint
 
 
