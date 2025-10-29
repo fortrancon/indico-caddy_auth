@@ -25,3 +25,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "indico_caddy_auth/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["indico_caddy_auth"]
