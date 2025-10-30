@@ -28,43 +28,10 @@ class CaddyAuthPlugin(IndicoPlugin):
         trusted_domains_str = os.environ.get('INDICO_CADDY_AUTH_TRUSTED_DOMAINS', '')
         self.trusted_domains = [domain.strip() for domain in trusted_domains_str.split(',') if domain.strip()]
 
-        # Read session cookie domain override from env var
-        self.session_cookie_domain = os.environ.get('INDICO_CADDY_AUTH_SESSION_COOKIE_DOMAIN_OVERRIDE')
-
-        # Debug logging for environment variables
-        self.logger.info('Environment variable INDICO_CADDY_AUTH_TRUSTED_DOMAINS: %r', trusted_domains_str)
-        self.logger.info('Parsed trusted_domains: %r', self.trusted_domains)
-        self.logger.info('Environment variable INDICO_CADDY_AUTH_SESSION_COOKIE_DOMAIN_OVERRIDE: %r', self.session_cookie_domain)
-
-        self._configure_session_cookie_domain()
         self._patch_multipass_redirect_validation()
 
     def get_blueprints(self):
         return blueprint
-
-    def _configure_session_cookie_domain(self):
-        """Configure session cookie domain if specified in environment."""
-        from flask import current_app
-
-        self.logger.info('_configure_session_cookie_domain called with self.session_cookie_domain: %r', self.session_cookie_domain)
-
-        if self.session_cookie_domain:
-            try:
-                # Check current Flask app config before setting
-                current_domain = current_app.config.get('SESSION_COOKIE_DOMAIN')
-                self.logger.info('Current Flask SESSION_COOKIE_DOMAIN before setting: %r', current_domain)
-
-                current_app.config['SESSION_COOKIE_DOMAIN'] = self.session_cookie_domain
-
-                # Verify it was set
-                new_domain = current_app.config.get('SESSION_COOKIE_DOMAIN')
-                self.logger.info('Flask SESSION_COOKIE_DOMAIN after setting: %r', new_domain)
-
-                self.logger.info('Successfully set session cookie domain to: %s', self.session_cookie_domain)
-            except Exception as e:
-                self.logger.error('Failed to set session cookie domain: %s', e)
-        else:
-            self.logger.info('No session cookie domain configured (environment variable not set or empty)')
 
     def _patch_multipass_redirect_validation(self):
         """Monkeypatch multipass to allow cross-subdomain redirects for configured trusted domains."""

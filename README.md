@@ -28,22 +28,21 @@ PLUGINS = {'caddy_auth'}
 3. Configure the plugin via environment variables:
 ```bash
 # Configure domains that are allowed for redirects after login (comma-separated)
-export INDICO_CADDY_AUTH_TRUSTED_DOMAINS="fortrancon.org,chat.example.com,.trusted.org"
-
-# Configure session cookie domain for cross-subdomain use (optional)
-export INDICO_CADDY_AUTH_SESSION_COOKIE_DOMAIN_OVERRIDE=".fortrancon.org"
+export INDICO_CADDY_AUTH_TRUSTED_DOMAINS="fortrancon.org,chat.fortrancon.org"
 ```
 
 **Domain Configuration Examples:**
 - `fortrancon.org` - Allows only fortrancon.org exactly
-- `chat.example.com` - Allows only chat.example.com exactly
+- `chat.fortrancon.org` - Allows only chat.fortrancon.org exactly
 - `.trusted.org` - Allows *.trusted.org (note the leading dot)
+
+**Note**: For Zulip, you typically only need `chat.fortrancon.org` in the trusted domains since Zulip handles its own session management.
 
 4. Restart Indico
 
 ## Usage with Caddy
 
-Configure Caddy to use the auth endpoint:
+Configure Caddy to use the auth endpoint. For Zulip, only the SSO login endpoint needs forward_auth:
 
 ```caddyfile
 events.fortrancon.org {
@@ -51,11 +50,17 @@ events.fortrancon.org {
 }
 
 chat.fortrancon.org {
-    forward_auth localhost:8080 {
-        uri /auth/validate
-        copy_headers Remote-User
-        header_up Host events.fortrancon.org
+    # Only protect the Zulip SSO login endpoint
+    handle /accounts/login/sso* {
+        forward_auth localhost:8080 {
+            uri /auth/validate
+            copy_headers Remote-User
+            header_up Host events.fortrancon.org
+        }
+        reverse_proxy localhost:9991
     }
+
+    # All other requests go directly to Zulip
     reverse_proxy localhost:9991
 }
 ```
@@ -63,16 +68,29 @@ chat.fortrancon.org {
 **Important Notes**:
 - Use `localhost:8080` (direct backend) for `forward_auth` to avoid Caddy loops
 - The `header_up Host events.fortrancon.org` line ensures Indico accepts the auth request
+- Only `/accounts/login/sso*` needs authentication - Zulip handles its own sessions afterward
 - Query parameters from the original request are preserved in redirect URLs
 
 ## How It Works
 
-1. User visits `chat.fortrancon.org`
+### Zulip SSO Flow
+
+1. User visits `chat.fortrancon.org` and clicks "Login with SSO"
+2. Browser redirects to `chat.fortrancon.org/accounts/login/sso`
+3. Caddy forward_auth calls `localhost:8080/auth/validate`
+4. If user is authenticated in Indico: Returns 200 with `Remote-User` header → Zulip logs user in
+5. If user is not authenticated: Returns redirect to Indico login page
+6. **Plugin monkeypatches Flask-Multipass** to allow redirects back to chat subdomain
+7. After Indico login, user is redirected back to Zulip SSO endpoint
+8. Zulip receives the authenticated user and creates its own session cookies
+
+### General Flow (for other services)
+
+1. User visits protected resource (e.g., `other.fortrancon.org`)
 2. Caddy calls `localhost:8080/auth/validate`
 3. If user is authenticated: Returns 200 with `Remote-User` header
 4. If user is not authenticated: Returns redirect to login page with return URL
-5. **Plugin monkeypatches Flask-Multipass** to allow redirects to configured trusted domains
-6. After login, user is redirected back to original URL with all parameters preserved
+5. After login, user is redirected back to original URL with all parameters preserved
 
 ### Cross-Domain Redirect Security
 
