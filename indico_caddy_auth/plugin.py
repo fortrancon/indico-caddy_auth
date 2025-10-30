@@ -8,7 +8,7 @@
 from urllib.parse import urlparse
 
 from indico.core.plugins import IndicoPlugin
-
+from indico.core import signals
 from indico_caddy_auth.blueprint import blueprint
 
 
@@ -32,7 +32,7 @@ class CaddyAuthPlugin(IndicoPlugin):
         self.session_cookie_domain = os.environ.get('INDICO_CADDY_AUTH_SESSION_COOKIE_DOMAIN_OVERRIDE')
 
         # Connect to app_created signal to configure session cookie domain
-        self.connect('core.app-created', self._configure_session_cookie_domain)
+        self.connect(signals.core.app_created, self._configure_session_cookie_domain)
 
         self._patch_multipass_redirect_validation()
 
