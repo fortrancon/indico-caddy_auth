@@ -20,27 +20,43 @@ class CaddyAuthPlugin(IndicoPlugin):
 
     def init(self):
         super().init()
+
+        # Parse environment variables once and store as class attributes
+        import os
+
+        # Read trusted domains from env var (comma-separated string)
+        trusted_domains_str = os.environ.get('INDICO_CADDY_AUTH_TRUSTED_DOMAINS', '')
+        self.trusted_domains = [domain.strip() for domain in trusted_domains_str.split(',') if domain.strip()]
+
+        # Read session cookie domain override from env var
+        self.session_cookie_domain = os.environ.get('INDICO_CADDY_AUTH_SESSION_COOKIE_DOMAIN_OVERRIDE')
+
+        self._configure_session_cookie_domain()
         self._patch_multipass_redirect_validation()
 
     def get_blueprints(self):
         return blueprint
 
+    def _configure_session_cookie_domain(self):
+        """Configure session cookie domain if specified in environment."""
+        from flask import current_app
+
+        if self.session_cookie_domain:
+            current_app.config['SESSION_COOKIE_DOMAIN'] = self.session_cookie_domain
+            self.logger.info('Set session cookie domain to: %s', self.session_cookie_domain)
+
     def _patch_multipass_redirect_validation(self):
         """Monkeypatch multipass to allow cross-subdomain redirects for configured trusted domains."""
-        from indico.core.config import config
-
-        # Get trusted domains from config
-        trusted_domains = getattr(config, 'CADDY_AUTH_TRUSTED_DOMAINS', [])
 
         # If no trusted domains configured, skip the monkeypatch entirely
-        if not trusted_domains:
+        if not self.trusted_domains:
             self.logger.info(
                 'No CADDY_AUTH_TRUSTED_DOMAINS configured - using default Flask-Multipass redirect validation'
             )
             return
 
         # Log the trusted domains for verification
-        self.logger.info('Allowing redirects to domains: %s', ', '.join(trusted_domains))
+        self.logger.info('Allowing redirects to domains: %s', ', '.join(self.trusted_domains))
 
         # Apply the monkeypatch only if we have trusted domains
         from indico.core.auth import multipass
@@ -59,7 +75,7 @@ class CaddyAuthPlugin(IndicoPlugin):
                 parsed = urlparse(url)
 
                 # Check against configured trusted domains
-                for domain in trusted_domains:
+                for domain in self.trusted_domains:
                     # Support both exact matches and wildcard subdomains
                     if parsed.netloc == domain:
                         return True

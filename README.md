@@ -20,25 +20,26 @@ cd caddy_auth
 pip install -e .
 ```
 
-2. Enable the plugin and configure trusted domains in your `indico.conf`:
+2. Enable the plugin in your `indico.conf`:
 ```python
 PLUGINS = {'caddy_auth'}
-
-# Configure domains that are allowed for redirects after login
-CADDY_AUTH_TRUSTED_DOMAINS = [
-    'fortrancon.org',      # Allows only fortrancon.org exactly
-    'chat.example.com',    # Allows only chat.example.com exactly
-    '.trusted.org',        # Allows *.trusted.org (note the leading dot)
-]
-
-# Configure session cookies for cross-subdomain use
-SESSION_COOKIE_DOMAIN = '.fortrancon.org'
-SESSION_COOKIE_SECURE = True
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
 ```
 
-3. Restart Indico
+3. Configure the plugin via environment variables:
+```bash
+# Configure domains that are allowed for redirects after login (comma-separated)
+export INDICO_CADDY_AUTH_TRUSTED_DOMAINS="fortrancon.org,chat.example.com,.trusted.org"
+
+# Configure session cookie domain for cross-subdomain use (optional)
+export INDICO_CADDY_AUTH_SESSION_COOKIE_DOMAIN_OVERRIDE=".fortrancon.org"
+```
+
+**Domain Configuration Examples:**
+- `fortrancon.org` - Allows only fortrancon.org exactly
+- `chat.example.com` - Allows only chat.example.com exactly
+- `.trusted.org` - Allows *.trusted.org (note the leading dot)
+
+4. Restart Indico
 
 ## Usage with Caddy
 
@@ -82,7 +83,7 @@ The plugin enhances Indico's Flask-Multipass `validate_next_url()` method to all
 - `'sub.domain.com'` - Allows only `sub.domain.com` exactly
 - `'.domain.com'` - Allows only subdomains (`*.domain.com`), not the bare domain
 
-**Examples** (with `CADDY_AUTH_TRUSTED_DOMAINS = ['fortrancon.org', '.example.com', 'chat.specific.org']`):
+**Examples** (with `INDICO_CADDY_AUTH_TRUSTED_DOMAINS="fortrancon.org,.example.com,chat.specific.org"`):
 - ✅ `https://fortrancon.org` (exact match)
 - ✅ `https://api.example.com` (subdomain, due to `.example.com`)
 - ✅ `https://chat.specific.org` (exact match)
