@@ -8,6 +8,9 @@ This plugin provides an authentication validation endpoint for Caddy's `forward_
 - Handles authentication redirects with proper return URLs
 - Integrates seamlessly with Indico's session management
 - Returns `Remote-User` header for authenticated users
+- **Monkeypatches Flask-Multipass** to allow cross-subdomain redirects for configured trusted domains
+- Preserves query parameters through the authentication flow
+- **Configurable trusted domains** via `CADDY_AUTH_TRUSTED_DOMAINS` setting
 
 ## Installation
 
@@ -17,9 +20,16 @@ cd caddy_auth
 pip install -e .
 ```
 
-2. Enable the plugin in your `indico.conf`:
+2. Enable the plugin and configure trusted domains in your `indico.conf`:
 ```python
 PLUGINS = {'caddy_auth'}
+
+# Configure domains that are allowed for redirects after login
+CADDY_AUTH_TRUSTED_DOMAINS = [
+    'fortrancon.org',      # Allows only fortrancon.org exactly
+    'chat.example.com',    # Allows only chat.example.com exactly
+    '.trusted.org',        # Allows *.trusted.org (note the leading dot)
+]
 
 # Configure session cookies for cross-subdomain use
 SESSION_COOKIE_DOMAIN = '.fortrancon.org'
@@ -43,10 +53,16 @@ chat.fortrancon.org {
     forward_auth localhost:8080 {
         uri /auth/validate
         copy_headers Remote-User
+        header_up Host events.fortrancon.org
     }
     reverse_proxy localhost:9991
 }
 ```
+
+**Important Notes**:
+- Use `localhost:8080` (direct backend) for `forward_auth` to avoid Caddy loops
+- The `header_up Host events.fortrancon.org` line ensures Indico accepts the auth request
+- Query parameters from the original request are preserved in redirect URLs
 
 ## How It Works
 
@@ -54,7 +70,33 @@ chat.fortrancon.org {
 2. Caddy calls `localhost:8080/auth/validate`
 3. If user is authenticated: Returns 200 with `Remote-User` header
 4. If user is not authenticated: Returns redirect to login page with return URL
-5. After login, user is redirected back to original URL
+5. **Plugin monkeypatches Flask-Multipass** to allow redirects to configured trusted domains
+6. After login, user is redirected back to original URL with all parameters preserved
+
+### Cross-Domain Redirect Security
+
+The plugin enhances Indico's Flask-Multipass `validate_next_url()` method to allow redirects to configured trusted domains:
+
+**Configuration Options:**
+- `'domain.com'` - Allows only `domain.com` exactly
+- `'sub.domain.com'` - Allows only `sub.domain.com` exactly
+- `'.domain.com'` - Allows only subdomains (`*.domain.com`), not the bare domain
+
+**Examples** (with `CADDY_AUTH_TRUSTED_DOMAINS = ['fortrancon.org', '.example.com', 'chat.specific.org']`):
+- ✅ `https://fortrancon.org` (exact match)
+- ✅ `https://api.example.com` (subdomain, due to `.example.com`)
+- ✅ `https://chat.specific.org` (exact match)
+- ❌ `https://events.fortrancon.org` (blocked, only exact `fortrancon.org` allowed)
+- ❌ `https://example.com` (blocked, only `.example.com` configured)
+- ❌ `https://malicious.com` (not in trusted list)
+
+**Security:**
+- ✅ **Configurable whitelist** - Only specified domains allowed
+- ✅ **Flexible patterns** - Support exact domains, subdomains, and wildcards
+- ❌ **External domains** blocked by default
+- 📝 **Plugin logging** - Shows trusted domains at startup for debugging
+
+This approach works with Indico's standard login flow and provides **maximum flexibility** for administrators.
 
 ## Development
 
