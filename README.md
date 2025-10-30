@@ -9,7 +9,7 @@ This plugin provides an authentication validation endpoint for Caddy's `forward_
 - Integrates seamlessly with Indico's session management
 - Returns `Remote-User` header for authenticated users
 - **Monkeypatches Flask-Multipass** to allow cross-subdomain redirects for configured trusted domains
-- **Configures session cookies for cross-subdomain authentication** via `SESSION_COOKIE_DOMAIN_OVERRIDE`
+- **Works with Indico's `SESSION_COOKIE_DOMAIN`** configuration for cross-subdomain session sharing
 - Preserves query parameters through the authentication flow
 - **Configurable trusted domains** via `CADDY_AUTH_TRUSTED_DOMAINS` setting
 
@@ -21,27 +21,24 @@ cd caddy_auth
 pip install -e .
 ```
 
-2. Enable the plugin in your `indico.conf`:
+2. Enable the plugin and configure session cookies in your `indico.conf`:
 ```python
 PLUGINS = {'caddy_auth'}
+
+# Configure session cookies for cross-subdomain authentication
+SESSION_COOKIE_DOMAIN = '.fortrancon.org'
 ```
 
 3. Configure the plugin via environment variables:
 ```bash
 # Configure domains that are allowed for redirects after login (comma-separated)
 export INDICO_CADDY_AUTH_TRUSTED_DOMAINS="chat.fortrancon.org"
-
-# REQUIRED: Configure session cookie domain for cross-subdomain authentication
-# This allows Indico session cookies to work when forwarded from other subdomains
-export INDICO_CADDY_AUTH_SESSION_COOKIE_DOMAIN_OVERRIDE=".fortrancon.org"
 ```
 
 **Domain Configuration Examples:**
 - `fortrancon.org` - Allows only fortrancon.org exactly
 - `chat.fortrancon.org` - Allows only chat.fortrancon.org exactly
 - `.trusted.org` - Allows *.trusted.org (note the leading dot)
-
-**Important**: The session cookie domain `.fortrancon.org` is required for cross-subdomain authentication to work. Without it, Indico sessions remain tied to `events.fortrancon.org` and can't be validated when forwarded from `chat.fortrancon.org`.
 
 4. Restart Indico
 
@@ -89,7 +86,7 @@ chat.fortrancon.org {
 5. If user is not authenticated: Returns redirect to Indico login page with return URL
 6. User logs into Indico on `events.fortrancon.org` → **session cookie set with domain `.fortrancon.org`**
 7. User gets redirected back to `/accounts/login/sso`
-8. Caddy calls `/auth/validate` again with the cross-subdomain session cookies
+8. Caddy calls `/auth/validate` again with the **cross-subdomain session cookies**
 9. Plugin validates the session and returns 200 with `Remote-User` header
 10. Zulip completes the login
 
