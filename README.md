@@ -9,6 +9,7 @@ This plugin provides an authentication validation endpoint for Caddy's `forward_
 - Integrates seamlessly with Indico's session management
 - Returns `Remote-User` header for authenticated users
 - **Monkeypatches Flask-Multipass** to allow cross-subdomain redirects for configured trusted domains
+- **Configures session cookies for cross-subdomain authentication** via `SESSION_COOKIE_DOMAIN_OVERRIDE`
 - Preserves query parameters through the authentication flow
 - **Configurable trusted domains** via `CADDY_AUTH_TRUSTED_DOMAINS` setting
 
@@ -28,7 +29,11 @@ PLUGINS = {'caddy_auth'}
 3. Configure the plugin via environment variables:
 ```bash
 # Configure domains that are allowed for redirects after login (comma-separated)
-export INDICO_CADDY_AUTH_TRUSTED_DOMAINS="fortrancon.org,chat.fortrancon.org"
+export INDICO_CADDY_AUTH_TRUSTED_DOMAINS="chat.fortrancon.org"
+
+# REQUIRED: Configure session cookie domain for cross-subdomain authentication
+# This allows Indico session cookies to work when forwarded from other subdomains
+export INDICO_CADDY_AUTH_SESSION_COOKIE_DOMAIN_OVERRIDE=".fortrancon.org"
 ```
 
 **Domain Configuration Examples:**
@@ -36,7 +41,7 @@ export INDICO_CADDY_AUTH_TRUSTED_DOMAINS="fortrancon.org,chat.fortrancon.org"
 - `chat.fortrancon.org` - Allows only chat.fortrancon.org exactly
 - `.trusted.org` - Allows *.trusted.org (note the leading dot)
 
-**Note**: For Zulip, you typically only need `chat.fortrancon.org` in the trusted domains since Zulip handles its own session management.
+**Important**: The session cookie domain `.fortrancon.org` is required for cross-subdomain authentication to work. Without it, Indico sessions remain tied to `events.fortrancon.org` and can't be validated when forwarded from `chat.fortrancon.org`.
 
 4. Restart Indico
 
@@ -56,6 +61,7 @@ chat.fortrancon.org {
             uri /auth/validate
             copy_headers Remote-User
             header_up Host events.fortrancon.org
+            header_up Cookie {http.request.header.Cookie}
         }
         reverse_proxy localhost:9991
     }
@@ -68,6 +74,7 @@ chat.fortrancon.org {
 **Important Notes**:
 - Use `localhost:8080` (direct backend) for `forward_auth` to avoid Caddy loops
 - The `header_up Host events.fortrancon.org` line ensures Indico accepts the auth request
+- The `header_up Cookie {http.request.header.Cookie}` line forwards session cookies so Indico can validate authentication
 - Only `/accounts/login/sso*` needs authentication - Zulip handles its own sessions afterward
 - Query parameters from the original request are preserved in redirect URLs
 
@@ -77,12 +84,14 @@ chat.fortrancon.org {
 
 1. User visits `chat.fortrancon.org` and clicks "Login with SSO"
 2. Browser redirects to `chat.fortrancon.org/accounts/login/sso`
-3. Caddy forward_auth calls `localhost:8080/auth/validate`
+3. Caddy forward_auth calls `localhost:8080/auth/validate` with user's cookies
 4. If user is authenticated in Indico: Returns 200 with `Remote-User` header → Zulip logs user in
-5. If user is not authenticated: Returns redirect to Indico login page
-6. **Plugin monkeypatches Flask-Multipass** to allow redirects back to chat subdomain
-7. After Indico login, user is redirected back to Zulip SSO endpoint
-8. Zulip receives the authenticated user and creates its own session cookies
+5. If user is not authenticated: Returns redirect to Indico login page with return URL
+6. User logs into Indico on `events.fortrancon.org` → **session cookie set with domain `.fortrancon.org`**
+7. User gets redirected back to `/accounts/login/sso`
+8. Caddy calls `/auth/validate` again with the cross-subdomain session cookies
+9. Plugin validates the session and returns 200 with `Remote-User` header
+10. Zulip completes the login
 
 ### General Flow (for other services)
 

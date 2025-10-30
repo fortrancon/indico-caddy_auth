@@ -28,10 +28,23 @@ class CaddyAuthPlugin(IndicoPlugin):
         trusted_domains_str = os.environ.get('INDICO_CADDY_AUTH_TRUSTED_DOMAINS', '')
         self.trusted_domains = [domain.strip() for domain in trusted_domains_str.split(',') if domain.strip()]
 
+        # Read session cookie domain override from env var
+        self.session_cookie_domain = os.environ.get('INDICO_CADDY_AUTH_SESSION_COOKIE_DOMAIN_OVERRIDE')
+
+        # Connect to app_created signal to configure session cookie domain
+        from indico.core import signals
+        signals.core.app_created.connect(self._configure_session_cookie_domain)
+
         self._patch_multipass_redirect_validation()
 
     def get_blueprints(self):
         return blueprint
+
+    def _configure_session_cookie_domain(self, app):
+        """Configure session cookie domain if specified in environment."""
+        if self.session_cookie_domain:
+            app.config['SESSION_COOKIE_DOMAIN'] = self.session_cookie_domain
+            self.logger.info('Set session cookie domain to: %s', self.session_cookie_domain)
 
     def _patch_multipass_redirect_validation(self):
         """Monkeypatch multipass to allow cross-subdomain redirects for configured trusted domains."""
