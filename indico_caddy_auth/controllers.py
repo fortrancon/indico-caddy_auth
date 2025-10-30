@@ -43,5 +43,5 @@ class RHCaddyAuthValidate(RH):
 
         # User authenticated - return success with Remote-User header
         response = make_response('', 200)
-        response.headers['Remote-User'] = user.email
+        response.headers['REMOTE_USER'] = user.email
         return response
