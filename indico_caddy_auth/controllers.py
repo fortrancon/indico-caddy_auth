@@ -20,24 +20,19 @@ class RHCaddyAuthValidate(RH):
         user = session.user
         if not user:
             # Build return URL from Caddy's forwarded headers
-            original_uri = request.headers.get('X-Forwarded-Uri', '')
-            original_host = request.headers.get('X-Forwarded-Host', 'chat.fortrancon.org')
-            original_proto = request.headers.get('X-Forwarded-Proto', 'https')
+            original_host_url = request.host_url
 
-            if original_uri:
-                # Include query parameters in the return URL
-                query_string = request.query_string.decode('utf-8')
-                if query_string:
-                    # If we have query parameters, add them to the original URI
-                    separator = '&' if '?' in original_uri else '?'
-                    full_uri = f'{original_uri}{separator}{query_string}'
-                else:
-                    full_uri = original_uri
-
-                return_url = f'{original_proto}://{original_host}{full_uri}'
-                login_url = urljoin(config.BASE_URL, f'login?next={return_url}')
+            # Include query parameters in the return URL
+            query_string = request.query_string.decode('utf-8')
+            if query_string:
+                # If we have query parameters, add them to the original URI
+                separator = '&' if '?' in original_uri else '?'
+                full_uri = f'{original_host_url}{separator}{query_string}'
             else:
-                login_url = urljoin(config.BASE_URL, 'login')
+                full_uri = original_host_url
+
+            return_url = f'{original_proto}://{original_host}{full_uri}'
+            login_url = urljoin(config.BASE_URL, f'login?next={return_url}')
 
             return redirect(login_url)
 
