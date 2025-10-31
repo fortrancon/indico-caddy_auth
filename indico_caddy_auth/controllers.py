@@ -34,14 +34,7 @@ class RHCaddyAuthValidate(RH):
             original_uri = request.headers.get('X-Forwarded-Uri', '')
 
             if original_uri:
-                query_string = request.query_string.decode('utf-8')
-                if query_string:
-                    separator = '&' if '?' in original_uri else '?'
-                    full_uri = f'{original_uri}{separator}{query_string}'
-                else:
-                    full_uri = original_uri
-
-                return_url = f'{original_proto}://{original_host}{full_uri}'
+                return_url = f'{original_proto}://{original_host}{original_uri}'
                 login_url = urljoin(config.BASE_URL, f'login?next={return_url}')
             else:
                 login_url = urljoin(config.BASE_URL, 'login')
