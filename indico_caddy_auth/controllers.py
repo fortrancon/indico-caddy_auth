@@ -5,7 +5,7 @@
 # them and/or modify them under the terms of the MIT License;
 # see the LICENSE file for more details.
 
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit
 
 from flask import make_response, redirect, request, session
 
@@ -34,8 +34,14 @@ class RHCaddyAuthValidate(RH):
             original_uri = request.headers.get('X-Forwarded-Uri', '')
 
             if original_uri:
-                next_path = request.args.get('next', '/')
-                return_url = urlunsplit((original_proto, original_host, next_path, None, None))
+                query_string = request.query_string.decode('utf-8')
+                if query_string:
+                    separator = '&' if '?' in original_uri else '?'
+                    full_uri = f'{original_uri}{separator}{query_string}'
+                else:
+                    full_uri = original_uri
+
+                return_url = f'{original_proto}://{original_host}{full_uri}'
                 login_url = urljoin(config.BASE_URL, f'login?next={return_url}')
             else:
                 login_url = urljoin(config.BASE_URL, 'login')
