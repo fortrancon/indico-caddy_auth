@@ -35,7 +35,6 @@ class CaddyAuthPlugin(IndicoPlugin):
 
     def _patch_multipass_redirect_validation(self):
         """Monkeypatch multipass to allow cross-subdomain redirects for configured trusted domains."""
-
         # If no trusted domains configured, skip the monkeypatch entirely
         if not self.trusted_domains:
             self.logger.info(

@@ -5,7 +5,7 @@
 # them and/or modify them under the terms of the MIT License;
 # see the LICENSE file for more details.
 
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from flask import make_response, redirect, request, session
 
@@ -20,19 +20,25 @@ class RHCaddyAuthValidate(RH):
         user = session.user
         if not user:
             # Build return URL from Caddy's forwarded headers
-            original_host_url = request.host_url
+            original_proto = request.headers.get('X-Forwarded-Proto', urlsplit(config.BASE_URL).scheme)
+            # X-Forwarded-Host can contain multiple hosts,for Indico to work it must have the BASE_URL
+            # get it, filter it, fallback to BASE_URL host
+            original_host = next(
+                (
+                    host
+                    for host in request.headers.get('X-Forwarded-Host', '').split(',')
+                    if host != urlsplit(config.BASE_URL).hostname
+                ),
+                urlsplit(config.BASE_URL).hostname,
+            )
+            original_uri = request.headers.get('X-Forwarded-Uri', '')
 
-            # Include query parameters in the return URL
-            query_string = request.query_string.decode('utf-8')
-            if query_string:
-                # If we have query parameters, add them to the original URI
-                separator = '&' if '?' in original_uri else '?'
-                full_uri = f'{original_host_url}{separator}{query_string}'
+            if original_uri:
+                next_path = request.args.get('next', '/')
+                return_url = urlunsplit((original_proto, original_host, next_path, None, None))
+                login_url = urljoin(config.BASE_URL, f'login?next={return_url}')
             else:
-                full_uri = original_host_url
-
-            return_url = f'{original_proto}://{original_host}{full_uri}'
-            login_url = urljoin(config.BASE_URL, f'login?next={return_url}')
+                login_url = urljoin(config.BASE_URL, 'login')
 
             return redirect(login_url)
 
